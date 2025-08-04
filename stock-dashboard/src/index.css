@@ -1,0 +1,13 @@
+body {
+  font-family: 'Inter', 'Roboto', 'Segoe UI', Arial, sans-serif;
+  background: #f8fafb;
+  color: #24344d;
+  margin: 0;
+  min-height: 100vh;
+}
+
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
