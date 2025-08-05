@@ -14,7 +14,6 @@ import { auth } from "./firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import Signup from "./Signup";
 import Login from "./Login";
-import LogoutButton from "./LogoutButton";
 
 const TIME_OPTIONS = [
   { label: "5 Minutes", period: "7d", interval: "5m" },
@@ -36,6 +35,11 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [showLogin, setShowLogin] = useState(true);
 
+  // Credits states
+  const [credits, setCredits] = useState(null);
+  const [loadingCredits, setLoadingCredits] = useState(false);
+  const [creditsError, setCreditsError] = useState(null);
+
   // Main dashboard states
   const [symbol, setSymbol] = useState("AAPL");
   const [symbolInput, setSymbolInput] = useState("AAPL");
@@ -50,7 +54,7 @@ export default function App() {
 
   const latestIndicatorValuesObj = data && data.length > 0 ? data[data.length - 1] : {};
 
-  // Backend URL - Update this to your deployed backend URL as needed
+  // Backend URL - Update to your backend URL
   const BACKEND_URL = "https://stock-indicator-alert.onrender.com";
 
   useEffect(() => {
@@ -58,7 +62,35 @@ export default function App() {
     return unsub;
   }, []);
 
-  // Debounce helper to limit API calls while typing
+  // Fetch/register user and their credits on login
+  useEffect(() => {
+    async function fetchCredits(u) {
+      if (!u) {
+        setCredits(null);
+        setCreditsError(null);
+        return;
+      }
+      setLoadingCredits(true);
+      try {
+        const res = await fetch(`${BACKEND_URL}/register_user`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ uid: u.uid, email: u.email }),
+        });
+        if (!res.ok) throw new Error("Failed to fetch credits");
+        const data = await res.json();
+        setCredits(data.credits);
+        setCreditsError(null);
+      } catch (e) {
+        setCreditsError("Could not fetch credits. Some features may not work.");
+        setCredits(null);
+      }
+      setLoadingCredits(false);
+    }
+    fetchCredits(user);
+  }, [user]);
+
+  // Debounce helper for autocomplete
   const debounce = (func, wait) => {
     let timeout;
     return (...args) => {
@@ -83,7 +115,6 @@ export default function App() {
         const json = await response.json();
         setSuggestions(json);
       } catch (err) {
-        console.error("Error fetching symbol suggestions:", err);
         setSuggestions([]);
       }
       setLoadingSuggestions(false);
@@ -91,7 +122,6 @@ export default function App() {
     []
   );
 
-  // Handle input change in symbol autocomplete textbox
   const onSymbolInputChange = (event, newInputValue, reason) => {
     if (reason === "input") {
       setSymbolInput(newInputValue.toUpperCase());
@@ -102,7 +132,6 @@ export default function App() {
     }
   };
 
-  // Handle when user selects a suggestion
   const onSymbolChange = (event, newValue) => {
     if (newValue) {
       if (typeof newValue === "string") {
@@ -136,7 +165,6 @@ export default function App() {
       else setError("Unexpected data format from server");
     } catch (e) {
       setError("Failed to fetch data.");
-      console.error(e);
     }
     setLoading(false);
   };
@@ -154,7 +182,7 @@ export default function App() {
     return `${month}/${year}`;
   };
 
-  // Conditionally render forms when not logged in
+  // Conditionally render signup/login if no user
   if (!user) {
     return (
       <div style={{ maxWidth: 420, margin: "48px auto", padding: 24 }}>
@@ -189,7 +217,7 @@ export default function App() {
     );
   }
 
-  // Render dashboard when logged in
+  // Logged in dashboard
   return (
     <Box
       sx={{
@@ -211,23 +239,25 @@ export default function App() {
             transition: "box-shadow .18s",
           }}
         >
-          <Typography
-            variant="h4"
-            fontWeight={800}
-            color="#24344d"
-            gutterBottom
-            sx={{ letterSpacing: "-1.2px", mb: 4 }}
-          >
-            <span style={{ color: "#3557d5", marginRight: 9 }}>
-              Market Master
-            </span>{" "}
-            Dashboard
-          </Typography>
-
-          <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-            <UserMenu user={user} />
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
+            <Typography
+              variant="h4"
+              fontWeight={800}
+              color="#24344d"
+              sx={{ letterSpacing: "-1.2px" }}
+            >
+              <span style={{ color: "#3557d5", marginRight: 9 }}>
+                Market Master
+              </span>
+              Dashboard
+            </Typography>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 3 }}>
+              <Typography variant="body2" fontWeight="bold" color="textSecondary">
+                {loadingCredits ? "Credits: ..." : credits !== null ? `Credits: ${credits}` : ""}
+              </Typography>
+              <UserMenu user={user} />
+            </Box>
           </Box>
-
 
           {/* Controls */}
           <Box
@@ -248,7 +278,7 @@ export default function App() {
                   ? option
                   : `${option.symbol} - ${option.name}`
               }
-              filterOptions={(x) => x} // Disable built-in filtering — rely on backend
+              filterOptions={(x) => x}
               inputValue={symbolInput}
               onInputChange={onSymbolInputChange}
               onChange={onSymbolChange}
@@ -264,9 +294,7 @@ export default function App() {
                     ...params.InputProps,
                     endAdornment: (
                       <>
-                        {loadingSuggestions ? (
-                          <CircularProgress color="inherit" size={20} />
-                        ) : null}
+                        {loadingSuggestions ? <CircularProgress color="inherit" size={20} /> : null}
                         {params.InputProps.endAdornment}
                       </>
                     ),
@@ -282,9 +310,7 @@ export default function App() {
               variant="outlined"
               value={selectedTime.label}
               onChange={(e) => {
-                const opt = TIME_OPTIONS.find(
-                  (opt) => opt.label === e.target.value
-                );
+                const opt = TIME_OPTIONS.find((opt) => opt.label === e.target.value);
                 if (opt) setSelectedTime(opt);
               }}
               sx={{ width: 140, background: "#fafbfc", borderRadius: 2 }}

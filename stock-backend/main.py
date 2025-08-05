@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 import yfinance as yf
 import pandas as pd
@@ -10,6 +10,9 @@ import requests
 import os
 from typing import List
 import json
+from sqlalchemy.orm import Session
+from database import Base, engine, SessionLocal
+from models import User
 
 import os
 from dotenv import load_dotenv
@@ -19,6 +22,16 @@ GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 if not GROQ_API_KEY:
     raise EnvironmentError("GROQ_API_KEY is not set in environment variables")
 
+# Create DB tables at launch
+Base.metadata.create_all(bind=engine)
+
+# Dependency for DB session
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 class ChatRequest(BaseModel):
     question: str
@@ -34,6 +47,29 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+FREE_CREDITS = 10
+
+class UserIn(BaseModel):
+    uid: str
+    email: str
+
+@app.post("/register_user")
+def register_user(user: UserIn, db: Session = Depends(get_db)):
+    db_user = db.query(User).filter(User.id == user.uid).first()
+    if db_user is None:
+        db_user = User(id=user.uid, email=user.email, credits=FREE_CREDITS)
+        db.add(db_user)
+        db.commit()
+        db.refresh(db_user)
+    return {"uid": db_user.id, "credits": db_user.credits}
+
+@app.get("/credits/{uid}")
+def get_credits(uid: str, db: Session = Depends(get_db)):
+    db_user = db.query(User).filter(User.id == uid).first()
+    if db_user is None:
+        return {"error": "user not found"}
+    return {"credits": db_user.credits}
 
 # Sample symbol master list combining US + Indian NSE stocks
 # Expand or replace this with a JSON file or external API integration
