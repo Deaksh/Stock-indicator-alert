@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 
-const LOCAL_STORAGE_KEY = "chatbot_panel_history";
 const POSITION_KEY = "chatbot_panel_position";
 const SIZE_KEY = "chatbot_panel_size";
 
@@ -15,6 +14,7 @@ const SUGGESTED_QUESTIONS = [
 ];
 
 export default function ChatbotPanel({
+  user,
   open,
   setOpen,
   symbol,
@@ -22,28 +22,28 @@ export default function ChatbotPanel({
   selectedTime,
   selectedIndicators,
 }) {
-  // Default welcome message if no history
+  // Declare hooks upfront
   const defaultWelcomeMsg = {
     role: "assistant",
-    content: "Hi! Ask me anything about stocks, indicators, this chart, or finance concepts.",
+    content:
+      "Hi! Ask me anything about stocks, indicators, this chart, or finance concepts.",
     timestamp: new Date().toISOString(),
   };
 
-  // Chat messages state
+  const storageKey = user ? `chatbot_panel_history_${user.uid}` : "chatbot_panel_history_guest";
+
   const [messages, setMessages] = useState(() => {
     try {
-      const saved = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY));
+      const saved = JSON.parse(localStorage.getItem(storageKey));
       return Array.isArray(saved) && saved.length ? saved : [defaultWelcomeMsg];
     } catch {
       return [defaultWelcomeMsg];
     }
   });
 
-  // Chat input and loading state
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Panel position and size state for dragging and resizing
   const [panelPos, setPanelPos] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(POSITION_KEY));
@@ -52,6 +52,7 @@ export default function ChatbotPanel({
       return { x: window.innerWidth - 420, y: window.innerHeight - 480 };
     }
   });
+
   const [panelSize, setPanelSize] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(SIZE_KEY));
@@ -81,15 +82,27 @@ export default function ChatbotPanel({
   const onMouseMove = (e) => {
     if (dragging.current) {
       setPanelPos({
-        x: Math.max(10, Math.min(e.clientX - dragOffset.current.x, window.innerWidth - panelSize.width - 10)),
-        y: Math.max(10, Math.min(e.clientY - dragOffset.current.y, window.innerHeight - 60)),
+        x: Math.max(
+          10,
+          Math.min(e.clientX - dragOffset.current.x, window.innerWidth - panelSize.width - 10)
+        ),
+        y: Math.max(
+          10,
+          Math.min(e.clientY - dragOffset.current.y, window.innerHeight - 60)
+        ),
       });
     }
     if (resizing.current) {
       const panelRect = panelRef.current.getBoundingClientRect();
       setPanelSize({
-        width: Math.max(280, Math.min(e.clientX - panelRect.left, window.innerWidth - panelPos.x - 20)),
-        height: Math.max(350, Math.min(e.clientY - panelRect.top, window.innerHeight - panelPos.y - 20)),
+        width: Math.max(
+          280,
+          Math.min(e.clientX - panelRect.left, window.innerWidth - panelPos.x - 20)
+        ),
+        height: Math.max(
+          350,
+          Math.min(e.clientY - panelRect.top, window.innerHeight - panelPos.y - 20)
+        ),
       });
     }
   };
@@ -127,15 +140,15 @@ export default function ChatbotPanel({
     if (chatEndRef.current) chatEndRef.current.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
-  // Persist chat history to localStorage
+  // Save chat history when messages change
   useEffect(() => {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(messages.slice(-30)));
-  }, [messages]);
+    localStorage.setItem(storageKey, JSON.stringify(messages.slice(-30)));
+  }, [messages, storageKey]);
 
   // Clear chat history handler
   const clearChatHistory = () => {
     setMessages([{ ...defaultWelcomeMsg, timestamp: new Date().toISOString() }]);
-    localStorage.removeItem(LOCAL_STORAGE_KEY);
+    localStorage.removeItem(storageKey);
   };
 
   // Format timestamp as hh:mm
@@ -152,7 +165,8 @@ export default function ChatbotPanel({
     setInput("");
 
     try {
-      const res = await fetch("http://localhost:8000/chat", {
+      // Replace with your deployed backend URL
+      const res = await fetch("https://stock-indicator-alert.onrender.com/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -171,7 +185,11 @@ export default function ChatbotPanel({
     } catch {
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: "Sorry, there was a problem contacting the AI assistant.", timestamp: new Date().toISOString() },
+        {
+          role: "assistant",
+          content: "Sorry, there was a problem contacting the AI assistant.",
+          timestamp: new Date().toISOString(),
+        },
       ]);
     }
 
