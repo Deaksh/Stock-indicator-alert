@@ -9,7 +9,8 @@ databases[asyncpg]
 asyncpg
 alembic
 aiofiles
-Jinja2fastapi
+Jinja2
+fastapi
 uvicorn[standard]
 pydantic
 requests
