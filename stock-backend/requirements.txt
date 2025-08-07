@@ -9,7 +9,30 @@ databases[asyncpg]
 asyncpg
 alembic
 aiofiles
+Jinja2fastapi
+uvicorn[standard]
+pydantic
+requests
+python-dotenv
+httpx
+sqlalchemy
+databases[asyncpg]
+asyncpg
+alembic
+aiofiles
 Jinja2
+email-validator
+passlib[bcrypt]
+python-multipart
+pytest
+pytest-asyncio
+firebase-admin
+yfinance
+# Use explicit recent pandas_ta version that fixes NaN import
+pandas_ta==0.3.17b0
+# Use compatible numpy version
+numpy>=1.23,<1.26
+setuptools
 email-validator
 passlib[bcrypt]
 python-multipart
