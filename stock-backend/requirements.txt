@@ -16,6 +16,7 @@ python-multipart
 pytest
 pytest-asyncio
 firebase-admin
+razorpay
 yfinance
 # Use explicit recent pandas_ta version that fixes NaN import
 pandas_ta>=0.3.14b
