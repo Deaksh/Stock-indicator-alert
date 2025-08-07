@@ -35,7 +35,7 @@ const AVAILABLE_INDICATORS = [
   { key: "rsi", label: "RSI" },
 ];
 
-const BACKEND_URL = "http://localhost:8000";
+const BACKEND_URL = "https://stock-indicator-alert.onrender.com";
 
 export default function App() {
   // Auth states
