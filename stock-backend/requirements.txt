@@ -17,8 +17,8 @@ pytest
 pytest-asyncio
 firebase-admin
 yfinance
-pandas_ta>=0.3.14b0
+pandas_ta
 setuptools
-numpy==1.21.6
+numpy
 
 
