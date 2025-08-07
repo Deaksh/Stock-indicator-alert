@@ -3,5 +3,7 @@ services:
     name: stock-backend
     env: docker
     repo: https://github.com/Deaksh/Stock-indicator-alert
+    region: oregon
+    plan: free
     dockerfilePath: stock-backend/Dockerfile
     autoDeploy: true
