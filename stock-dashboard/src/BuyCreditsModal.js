@@ -32,7 +32,7 @@ export default function BuyCreditsModal({ open, onClose, uid, onCreditsUpdated, 
       // Display backend error message if available
       throw new Error(data.error || "Failed to create order");
     }
-
+    const API_BASE_URL = "https://stock-indicator-alert.onrender.com";
     const options = {
       key: data.key,
       amount: data.amount,
@@ -40,7 +40,7 @@ export default function BuyCreditsModal({ open, onClose, uid, onCreditsUpdated, 
       order_id: data.order_id,
       handler: async (response) => {
         // Refetch credits and update UI after payment success
-        const creditsRes = await fetch(`http://localhost:8000/credits/${uid}`);
+        const creditsRes = await fetch(`${API_BASE_URL}/credits/${uid}`);
         const creditsData = await creditsRes.json();
 
         if (creditsData.credits !== undefined) {
