@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: stock-backend
+    env: docker
+    repo: https://github.com/Deaksh/Stock-indicator-alert
+    dockerfilePath: stock-backend/Dockerfile
+    autoDeploy: true
