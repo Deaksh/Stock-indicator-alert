@@ -29,6 +29,8 @@ pytest
 pytest-asyncio
 firebase-admin
 yfinance
+setuptools
+wheel
 # Use explicit recent pandas_ta version that fixes NaN import
 pandas_ta>=0.3.14b
 # Use compatible numpy version
