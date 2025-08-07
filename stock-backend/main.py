@@ -22,6 +22,14 @@ GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 if not GROQ_API_KEY:
     raise EnvironmentError("GROQ_API_KEY is not set in environment variables")
 
+from payment.routes import router as payment_router
+
+app = FastAPI()
+
+# Mount payment routes
+app.include_router(payment_router, prefix="/payment")
+
+
 # Create DB tables at launch
 Base.metadata.create_all(bind=engine)
 
@@ -39,8 +47,9 @@ class ChatRequest(BaseModel):
     indicator_values: Optional[Dict] = None
     time_period: Optional[Dict] = None  # Should have keys 'label', 'interval', etc.
     selected_indicators: Optional[List[str]] = None
+    uid: Optional[str] = None
 
-app = FastAPI()
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],    # For development only
@@ -54,21 +63,41 @@ class UserIn(BaseModel):
     uid: str
     email: str
 
+class BuyCreditsRequest(BaseModel):
+    uid: str
+    amount: int  # Number of credits to add
+
+@app.post("/buy_credits")
+def buy_credits(req: BuyCreditsRequest, db: Session = Depends(get_db)):
+    db_user = db.query(User).filter(User.id == req.uid).first()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if req.amount <= 0:
+        raise HTTPException(status_code=400, detail="Invalid credit amount")
+
+    db_user.credits += req.amount
+    db.commit()
+    return {"credits": db_user.credits}
+
+
 @app.post("/register_user")
 def register_user(user: UserIn, db: Session = Depends(get_db)):
     db_user = db.query(User).filter(User.id == user.uid).first()
+    is_new = False
     if db_user is None:
         db_user = User(id=user.uid, email=user.email, credits=FREE_CREDITS)
         db.add(db_user)
         db.commit()
         db.refresh(db_user)
-    return {"uid": db_user.id, "credits": db_user.credits}
+        is_new = True
+    return {"uid": db_user.id, "credits": db_user.credits, "is_new": is_new}
+
 
 @app.get("/credits/{uid}")
 def get_credits(uid: str, db: Session = Depends(get_db)):
     db_user = db.query(User).filter(User.id == uid).first()
     if db_user is None:
-        return {"error": "user not found"}
+        raise HTTPException(status_code=404, detail="User not found")
     return {"credits": db_user.credits}
 
 # Sample symbol master list combining US + Indian NSE stocks
@@ -78,7 +107,7 @@ SYMBOLS = [
     {"symbol": "AMD", "name": "Advanced Micro Devices, Inc."},
     {"symbol": "TSLA", "name": "Tesla, Inc."},
     {"symbol": "RELIANCE.NS", "name": "Reliance Industries Limited"},
-    {"symbol": "TCS.NS", "name": "Tata Consultancy Services Limited"},
+    {"symbol": "TCS.NS", "name": "Tata Consultancy services Limited"},
     {"symbol": "INFY.NS", "name": "Infosys Limited"},
     {"symbol": "MSFT", "name": "Microsoft Corporation"},
 ]
@@ -96,13 +125,34 @@ def symbol_search(q: str = Query(..., min_length=1)):
     # For India-only: add &exchange=NSE
     return [{"symbol": r["symbol"], "name": r["name"]} for r in results]
 
+from fastapi import HTTPException
+
 @app.post("/chat")
-def chat(req: ChatRequest):
-    """Context-aware AI chatbot endpoint using Groq's Llama."""
+def chat(req: ChatRequest, db: Session = Depends(get_db)):
+    if req.uid:
+        db_user = db.query(User).filter(User.id == req.uid).first()
+        if not db_user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        if db_user.credits < 1:
+            # If no credits, return a message and do **not** run AI call
+            return {"response": "You have run out of AI credits. Please purchase more to continue."}
+        print(f"Received chat request from uid={req.uid}")
+        if req.uid:
+            print(f"User before decrement credits: {db_user.credits + 1}")
+
+        # Decrement credits
+        db_user.credits -= 1
+        db.commit()
+
+
+
+    # Existing chat logic here (AI call etc)...
     system_message = (
-        "You are an expert AI financial analyst. "
-        "Always use the user's context (symbol, period, interval, indicators, and chart values) if provided. "
-        "Be accurate, give short technical explanations, and never make up prices/data."
+        "You are 'Maven', the expert AI financial analyst assistant. "
+    "Always use the user's context (symbol, period, interval, indicators, and chart values) if provided. "
+    "Be accurate, give short technical explanations, and never make up prices/data. "
+    "Always introduce yourself as Maven when asked your name."
     )
     user_message = req.question.strip()
     if req.symbol:
@@ -142,9 +192,8 @@ def chat(req: ChatRequest):
             return {"response": f"[Groq error]: Unexpected API response: {resp_json}"}
         content = resp_json["choices"][0]["message"]["content"]
     except Exception as exc:
-        # Show the error for debugging (remove in prod)
         return {"response": f"Exception: {str(exc)} | Raw: {getattr(resp, 'text', '')[:200]}"}
-    return {"response": content}
+    return {"response": content, "credits": db_user.credits}
 
 @app.get("/history")
 def get_history(

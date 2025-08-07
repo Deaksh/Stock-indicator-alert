@@ -3,17 +3,22 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer,
   BarChart, Bar, CartesianGrid, ReferenceDot, ReferenceLine
 } from "recharts";
-import ChatbotPanel from "./ChatbotPanel";
 import {
   Box, Paper, Typography, TextField, Button, Checkbox,
-  FormControlLabel, MenuItem, Alert, CircularProgress, Autocomplete
+  FormControlLabel, MenuItem, Alert, CircularProgress, Autocomplete,
+  Dialog, DialogTitle, DialogContent, DialogActions
 } from "@mui/material";
 
+import ChatbotPanel from "./ChatbotPanel";
 import UserMenu from "./UserMenu";
-import { auth } from "./firebase";
-import { onAuthStateChanged } from "firebase/auth";
 import Signup from "./Signup";
 import Login from "./Login";
+
+import { auth } from "./firebase";
+import { onAuthStateChanged } from "firebase/auth";
+
+import BuyCreditsModal from "./BuyCreditsModal";
+
 
 const TIME_OPTIONS = [
   { label: "5 Minutes", period: "7d", interval: "5m" },
@@ -30,6 +35,8 @@ const AVAILABLE_INDICATORS = [
   { key: "rsi", label: "RSI" },
 ];
 
+const BACKEND_URL = "http://localhost:8000";
+
 export default function App() {
   // Auth states
   const [user, setUser] = useState(null);
@@ -39,6 +46,7 @@ export default function App() {
   const [credits, setCredits] = useState(null);
   const [loadingCredits, setLoadingCredits] = useState(false);
   const [creditsError, setCreditsError] = useState(null);
+  const [isNewUser, setIsNewUser] = useState(false);
 
   // Main dashboard states
   const [symbol, setSymbol] = useState("AAPL");
@@ -52,22 +60,27 @@ export default function App() {
   const [error, setError] = useState(null);
   const [chatOpen, setChatOpen] = useState(false);
 
+  // UI state for welcome and buy credits dialogs
+  const [showWelcome, setShowWelcome] = useState(false);
+  const [showBuyCredits, setShowBuyCredits] = useState(false);
+  const [buyingCredits, setBuyingCredits] = useState(false); // For showing spinner during purchase
+
+  // Latest indicator values for chat context
   const latestIndicatorValuesObj = data && data.length > 0 ? data[data.length - 1] : {};
 
-  // Backend URL - Update to your backend URL
-  const BACKEND_URL = "https://stock-indicator-alert.onrender.com";
-
+  // Listen to auth state
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setUser(u));
     return unsub;
   }, []);
 
-  // Fetch/register user and their credits on login
+  // Fetch/register user and their credits after auth change
   useEffect(() => {
     async function fetchCredits(u) {
       if (!u) {
         setCredits(null);
         setCreditsError(null);
+        setIsNewUser(false);
         return;
       }
       setLoadingCredits(true);
@@ -78,19 +91,27 @@ export default function App() {
           body: JSON.stringify({ uid: u.uid, email: u.email }),
         });
         if (!res.ok) throw new Error("Failed to fetch credits");
-        const data = await res.json();
-        setCredits(data.credits);
+        const json = await res.json();
+        setCredits(json.credits);
         setCreditsError(null);
+
+        if (json.is_new) {
+          setIsNewUser(true);
+          setShowWelcome(true);
+        } else {
+          setIsNewUser(false);
+        }
       } catch (e) {
         setCreditsError("Could not fetch credits. Some features may not work.");
         setCredits(null);
       }
       setLoadingCredits(false);
     }
+
     fetchCredits(user);
   }, [user]);
 
-  // Debounce helper for autocomplete
+  // Debounced fetch for symbol suggestions
   const debounce = (func, wait) => {
     let timeout;
     return (...args) => {
@@ -108,10 +129,10 @@ export default function App() {
       }
       setLoadingSuggestions(true);
       try {
-        const response = await fetch(`${BACKEND_URL}/symbols?q=${encodeURIComponent(query)}`);
-        if (!response.ok) {
-          throw new Error("Failed to fetch suggestions");
-        }
+        const response = await fetch(
+          `${BACKEND_URL}/symbols?q=${encodeURIComponent(query)}`
+        );
+        if (!response.ok) throw new Error("Failed to fetch suggestions");
         const json = await response.json();
         setSuggestions(json);
       } catch (err) {
@@ -181,6 +202,51 @@ export default function App() {
     const [year, month] = dateString.split("-");
     return `${month}/${year}`;
   };
+
+  // Handle closing welcome dialog
+  const handleCloseWelcome = () => {
+    setShowWelcome(false);
+  };
+
+  // Handle "Buy Credits" button click (opens buy credits modal)
+  const handleOpenBuyCredits = () => {
+    setShowBuyCredits(true);
+  };
+
+  const handleCloseBuyCredits = () => {
+    if (!buyingCredits) setShowBuyCredits(false);
+  };
+
+  // Simulate credit purchase flow (replace with real payment logic)
+  const handlePurchaseCredits = async (purchaseAmount = 10) => {
+    setBuyingCredits(true);
+
+    try {
+      // Call your backend route to increment credits (example payload below)
+      const res = await fetch(`${BACKEND_URL}/buy_credits`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uid: user.uid, amount: purchaseAmount }),
+      });
+      if (!res.ok) throw new Error("Purchase failed");
+      const data = await res.json();
+      // Update credits in frontend state with server response
+      setCredits(data.credits);
+      setShowBuyCredits(false);
+    } catch (e) {
+      alert("Purchase failed, please try again.");
+    }
+
+    setBuyingCredits(false);
+  };
+
+  // Disable chat opening if user has zero credits
+  useEffect(() => {
+    if (credits === 0 && chatOpen) {
+      setChatOpen(false);
+      setShowBuyCredits(true);
+    }
+  }, [credits, chatOpen]);
 
   // Conditionally render signup/login if no user
   if (!user) {
@@ -252,9 +318,22 @@ export default function App() {
               Dashboard
             </Typography>
             <Box sx={{ display: "flex", alignItems: "center", gap: 3 }}>
-              <Typography variant="body2" fontWeight="bold" color="textSecondary">
-                {loadingCredits ? "Credits: ..." : credits !== null ? `Credits: ${credits}` : ""}
+              <Typography variant="body2" fontWeight="bold" color="textSecondary" sx={{userSelect:"none"}}>
+                {loadingCredits
+                  ? "Credits: ..."
+                  : credits !== null
+                    ? `Credits: ${credits}`
+                    : ""}
               </Typography>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={handleOpenBuyCredits}
+                disabled={loadingCredits}
+                sx={{ textTransform: "none" }}
+              >
+                Buy Credits
+              </Button>
               <UserMenu user={user} />
             </Box>
           </Box>
@@ -586,10 +665,20 @@ export default function App() {
                 )}
             </>
           )}
+
         </Paper>
       </Box>
 
-      {/* Chatbot panel */}
+      <BuyCreditsModal
+        open={showBuyCredits}
+        onClose={() => setShowBuyCredits(false)}
+        uid={user.uid}
+        onCreditsUpdated={setCredits}
+        email={user.email}
+        contact={user.phoneNumber ?? ""}
+       />
+
+      {/* Chatbot Panel */}
       <ChatbotPanel
         open={chatOpen}
         setOpen={setChatOpen}
@@ -598,7 +687,26 @@ export default function App() {
         indicatorValues={latestIndicatorValuesObj}
         selectedTime={selectedTime}
         selectedIndicators={selectedIndicators}
+        credits={credits}
+        setCredits={setCredits}
+        botName="Maven AI"
+        onOutOfCredits={() => setShowBuyCredits(true)}
       />
+
+      {/* Welcome Dialog */}
+      <Dialog open={showWelcome} onClose={handleCloseWelcome}>
+        <DialogTitle>Welcome, {user?.email}!</DialogTitle>
+        <DialogContent>
+          <Typography>
+            You’ve received {credits !== null ? credits : "some"} free AI credits to get started. Enjoy exploring AI-powered insights with Maven!
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseWelcome} autoFocus>
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

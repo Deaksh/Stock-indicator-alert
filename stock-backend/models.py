@@ -6,3 +6,5 @@ class User(Base):
     id = Column(String, primary_key=True, index=True)      # Firebase UID
     email = Column(String, unique=True, index=True)
     credits = Column(Integer, default=10)
+
+

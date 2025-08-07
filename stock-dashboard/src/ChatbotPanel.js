@@ -21,12 +21,16 @@ export default function ChatbotPanel({
   indicatorValues,
   selectedTime,
   selectedIndicators,
+  credits,
+  setCredits,
+  botName,
+  onOutOfCredits,
 }) {
   // Declare hooks upfront
   const defaultWelcomeMsg = {
     role: "assistant",
     content:
-      "Hi! Ask me anything about stocks, indicators, this chart, or finance concepts.",
+      "Hi! Ask me anything about stocks, indicators, this chart, or finance concepts. I'm Maven.",
     timestamp: new Date().toISOString(),
   };
 
@@ -166,7 +170,7 @@ export default function ChatbotPanel({
 
     try {
       // Replace with your deployed backend URL
-      const res = await fetch("https://stock-indicator-alert.onrender.com/chat", {
+      const res = await fetch("http://localhost:8000/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -175,13 +179,20 @@ export default function ChatbotPanel({
           indicator_values: indicatorValues || {},
           time_period: selectedTime || {},
           selected_indicators: selectedIndicators || [],
+          uid: user?.uid || null,
         }),
       });
       const data = await res.json();
+      // Append assistant response
       setMessages((prev) => [
         ...prev,
         { role: "assistant", content: data.response, timestamp: new Date().toISOString() },
       ]);
+
+      // Update credits dynamically
+    if (typeof data.credits === "number") {
+      setCredits(data.credits);
+    }
     } catch {
       setMessages((prev) => [
         ...prev,
@@ -283,7 +294,7 @@ export default function ChatbotPanel({
           <span role="img" aria-label="bot" style={{ fontSize: 17, marginRight: 8 }}>
             🤖
           </span>
-          Stock AI Assistant
+          Maven AI Assistant
         </span>
         <span style={{ display: "flex", alignItems: "center" }}>
           <button
