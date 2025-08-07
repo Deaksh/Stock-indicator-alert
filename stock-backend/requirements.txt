@@ -18,3 +18,5 @@ pytest-asyncio
 firebase-admin
 yfinance
 pandas_ta
+setuptools
+
