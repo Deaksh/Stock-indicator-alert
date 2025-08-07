@@ -32,7 +32,7 @@ export default function BuyCreditsModal({ open, onClose, uid, onCreditsUpdated, 
       // Display backend error message if available
       throw new Error(data.error || "Failed to create order");
     }
-    const API_BASE_URL = "https://stock-indicator-alert.onrender.com";
+    const API_BASE_URL = "https://stock-indicator-alert-1.onrender.com";
     const options = {
       key: data.key,
       amount: data.amount,
