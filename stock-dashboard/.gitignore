@@ -21,3 +21,15 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Ignore database file
+test.db
+
+# Python virtual environments
+venv/
+stock-backend/venv/
+stock-dashboard/venv/
+
+# Node modules
+node_modules/
+
