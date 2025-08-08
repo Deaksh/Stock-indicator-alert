@@ -183,6 +183,7 @@ export default function ChatbotPanel({
         }),
       });
       const data = await res.json();
+      console.log("Chatbot response:", json);
       // Append assistant response
       setMessages((prev) => [
         ...prev,
