@@ -170,7 +170,7 @@ export default function ChatbotPanel({
 
     try {
       // Replace with your deployed backend URL
-      const res = await fetch("https://stock-indicator-alert-1.onrender.com", {
+      const res = await fetch("https://stock-indicator-alert-1.onrender.com/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
