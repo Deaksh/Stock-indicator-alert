@@ -2,8 +2,6 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Disable pip's partial git clone (CRITICAL)
-ENV GIT_PIP_NO_FILTER=1
 ENV PYTHONUNBUFFERED=1
 
 RUN apt-get update && apt-get install -y \
@@ -12,10 +10,15 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
+# Install Python deps (WITHOUT pandas-ta)
 COPY requirements.txt .
-
 RUN pip install --upgrade pip setuptools wheel \
     && pip install --no-cache-dir -r requirements.txt
+
+# Clone pandas-ta manually (NO partial clone)
+RUN git clone https://github.com/twopirllc/pandas-ta.git /tmp/pandas-ta \
+    && pip install /tmp/pandas-ta \
+    && rm -rf /tmp/pandas-ta
 
 COPY . .
 
