@@ -17,10 +17,10 @@ pytest
 pytest-asyncio
 firebase-admin
 razorpay
-pandas
+pandas>=1.5
 yfinance>=0.2.30
 # Use explicit recent pandas_ta version that fixes NaN import
-pandas_ta
+pandas-ta
 # Use compatible numpy version
 numpy
 setuptools>=65.0.0
