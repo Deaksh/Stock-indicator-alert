@@ -20,7 +20,6 @@ razorpay
 pandas>=1.5
 yfinance>=0.2.30
 # Use explicit recent pandas_ta version that fixes NaN import
-git+https://github.com/twopirllc/pandas-ta.git
 # Use compatible numpy version
 numpy
 setuptools>=65.0.0
